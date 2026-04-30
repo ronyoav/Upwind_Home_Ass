@@ -1,4 +1,4 @@
-var BACKEND_URL = "https://YOUR_BACKEND_URL/api/v1/analyze";
+var BACKEND_URL = "https://upwind-home-ass.onrender.com/api/v1/analyze";
 
 function onGmailMessage(e) {
   var accessToken = e.messageMetadata.accessToken;
