@@ -9,13 +9,14 @@ _URGENCY_PATTERNS = [
 ]
 
 _CREDENTIAL_PATTERNS = [
-    r"\bverify your (account|identity|email|password|information)\b",
-    r"\bconfirm your (account|identity|email|password|information)\b",
-    r"\bupdate your (payment|billing|card|account)\b",
+    r"\bverify your (account|identity|email|password|information|details)\b",
+    r"\bconfirm your (account|identity|email|password|information|details)\b",
+    r"\bupdate your (payment|billing|card|account|details|information)\b",
     r"\benter your (password|credentials|pin|ssn|social security)\b",
     r"\bsign in to (secure|verify|confirm)\b",
     r"\byour account (has been|will be) (suspended|locked|closed|terminated)\b",
     r"\bunusual (activity|sign.in|login) detected\b",
+    r"\b(provide|submit|share) your (details|information|credentials)\b",
 ]
 
 _FINANCIAL_PATTERNS = [

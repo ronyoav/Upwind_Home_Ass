@@ -182,11 +182,23 @@ def _is_lookalike(domain: str) -> bool:
         .replace("р", "p").replace("с", "c").replace("х", "x")
         .replace("ο", "o").replace("ν", "v")                      # Greek
     )
+    # Normalize multi-character visual substitutions: rn→m, vv→w, cl→d, li→li(1→l)
+    visual = (
+        normalized
+        .replace("rn", "m")
+        .replace("vv", "w")
+        .replace("cl", "d")
+        .replace("1", "l")
+        .replace("0", "o")
+    )
     for brand, legit in _KNOWN_BRANDS.items():
-        if brand.split()[0] in normalized and normalized != legit:
-            return True
+        brand_word = brand.split()[0]
+        for candidate in (normalized, visual):
+            if brand_word in candidate and domain != legit:
+                return True
     # Digit-substitution typosquats — only fire if NOT a legit domain
-    if re.search(r"(pay[p\d]a[l1]|g[o0]{2}gle|micr[o0]s[o0]ft|app[l1]e|amaz[o0]n)", normalized):
-        if normalized not in _KNOWN_BRANDS.values():
-            return True
+    for candidate in (normalized, visual):
+        if re.search(r"(pay[p\d]a[l1]|g[o0]{2}gle|micr[o0]s[o0]ft|app[l1]e|amaz[o0]n)", candidate):
+            if domain not in _KNOWN_BRANDS.values():
+                return True
     return False
