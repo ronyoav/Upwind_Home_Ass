@@ -23,7 +23,7 @@ _BAD_DOMAINS = {
 }
 
 
-def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None) -> tuple[int, list[Signal]]:
+def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None, has_base64_payload: bool = False) -> tuple[int, list[Signal]]:
     score = 0
     signals = []
 
@@ -56,6 +56,14 @@ def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None) -> 
                 severity="high",
                 description=f"URL matches known malicious domain: {_extract_domain(bad[0])}.",
             ))
+
+    if has_base64_payload:
+        score += 30
+        signals.append(Signal(
+            type="base64_payload",
+            severity="high",
+            description="HTML contains suspicious base64-encoded content — a technique used to hide malicious scripts from filters.",
+        ))
 
     if link_mismatches:
         score += 30

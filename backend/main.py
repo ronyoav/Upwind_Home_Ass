@@ -37,7 +37,7 @@ def analyze_email(request: EmailAnalysisRequest) -> EmailAnalysisResponse:
 
     header_score, header_signals = analyze_headers(sanitized["headers"])
     content_score, content_signals = analyze_content(sanitized["body"], sanitized["subject"])
-    url_score, url_signals = analyze_urls(sanitized["urls"], sanitized["link_mismatches"])
+    url_score, url_signals = analyze_urls(sanitized["urls"], sanitized["link_mismatches"], sanitized["has_base64_payload"])
     attachment_score, attachment_signals = analyze_attachments(sanitized["attachments"])
 
     vt_score, vt_signals = analyze_with_virustotal(sanitized["attachments"])
