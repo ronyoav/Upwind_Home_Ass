@@ -52,6 +52,14 @@ _QR_PATTERNS = [
     r"\buse your (camera|phone) to scan\b",
 ]
 
+_CAPTCHA_PATTERNS = [
+    r"\bcaptcha\b",
+    r"\bi('m| am) not a robot\b",
+    r"\bprove (you are|you're) (human|not a robot)\b",
+    r"\bcomplete (the |a )?verification\b",
+    r"\bhuman verification\b",
+]
+
 _SEXTORTION_PATTERNS = [
     r"\bI have (access to|hacked|infected) your (camera|webcam|device|computer)\b",
     r"\bI (recorded|filmed|captured) you\b",
@@ -96,6 +104,11 @@ def analyze_content(body: str, subject: str) -> tuple[int, list[Signal]]:
     if qr_hits >= 1:
         score += 20
         signals.append(Signal(type="qr_code_lure", severity="medium", description="Email requests QR code scan — destination URL is hidden and cannot be verified."))
+
+    captcha_hits = _count_matches(text, _CAPTCHA_PATTERNS)
+    if captcha_hits >= 1:
+        score += 20
+        signals.append(Signal(type="captcha_lure", severity="medium", description="Email mentions CAPTCHA verification — used to hide phishing pages from automated security scanners."))
 
     ransomware_hits = _count_matches(text, _RANSOMWARE_PATTERNS)
     if ransomware_hits >= 1:
