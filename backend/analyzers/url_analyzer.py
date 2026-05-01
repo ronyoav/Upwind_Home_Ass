@@ -9,8 +9,15 @@ _SHORTENERS = {
 
 _SUSPICIOUS_TLDS = {
     ".xyz", ".top", ".click", ".loan", ".work", ".gq",
-    ".ml", ".cf", ".tk", ".pw", ".cc", ".su",
+    ".ml", ".cf", ".tk", ".pw", ".cc", ".su", ".co",
 }
+
+# Keywords commonly used in phishing domains to appear legitimate
+_PHISHING_KEYWORDS = re.compile(
+    r"(secure|security|login|verify|verification|account|update|confirm|"
+    r"drive|support|helpdesk|authenticate|validation|access|portal|signin)",
+    re.IGNORECASE,
+)
 
 _IP_URL_RE = re.compile(r"https?://\d{1,3}(\.\d{1,3}){3}")
 
@@ -57,6 +64,16 @@ def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None, has
                 description=f"URL matches known malicious domain: {_extract_domain(bad[0])}.",
             ))
 
+        keyword_domains = [u for u in urls if _has_phishing_keywords(u)]
+        if keyword_domains:
+            score += 20
+            example = _extract_domain(keyword_domains[0])
+            signals.append(Signal(
+                type="phishing_keyword_domain",
+                severity="medium",
+                description=f"Domain '{example}' contains keywords commonly used in phishing URLs (secure, login, verify, drive, etc.).",
+            ))
+
     if has_base64_payload:
         score += 30
         signals.append(Signal(
@@ -99,6 +116,11 @@ def _has_suspicious_tld(url: str) -> bool:
 def _is_bad_domain(url: str) -> bool:
     domain = _extract_domain(url)
     return domain in _BAD_DOMAINS if domain else False
+
+
+def _has_phishing_keywords(url: str) -> bool:
+    domain = _extract_domain(url)
+    return bool(_PHISHING_KEYWORDS.search(domain)) if domain else False
 
 
 def _extract_domain(url: str) -> str | None:
