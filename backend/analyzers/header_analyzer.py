@@ -3,7 +3,7 @@ from backend.models.email_request import EmailHeaders, Signal
 
 # Known legitimate third-party email senders (ATS, marketing platforms)
 _TRUSTED_THIRD_PARTY_DOMAINS = {
-    # ATS platforms
+    # ATS / HR platforms
     "comeet-notifications.com", "comeet.co",
     "sparkhire.com", "spark-hire.com",
     "greenhouse.io", "greenhouse-mail.io",
@@ -12,6 +12,12 @@ _TRUSTED_THIRD_PARTY_DOMAINS = {
     "workable.com", "workablemail.com",
     "bamboohr.com",
     "smartrecruiters.com",
+    "myworkday.com", "workday.com",
+    "icims.com",
+    "taleo.net",
+    "successfactors.com", "successfactors.eu",
+    "sap.com",
+    "oracle.com",
     # Email marketing & transactional
     "sendgrid.net", "sendgrid.com",
     "mailchimp.com", "mandrillapp.com",
@@ -21,6 +27,25 @@ _TRUSTED_THIRD_PARTY_DOMAINS = {
     "mailgun.org", "mailgun.net",
     "amazonses.com",
     "sparkpostmail.com",
+    "postmarkapp.com",
+    "customer.io",
+    "klaviyo.com",
+    "constantcontact.com",
+    "campaignmonitor.com",
+    # Calendar & notifications
+    "calendar-server.bounces.google.com",
+    "notifications.google.com",
+    "zoom.us",
+    "calendly.com",
+    # E-commerce & payments
+    "shopify.com", "mail.shopify.com",
+    "stripe.com",
+    "paypal.com",
+    # LinkedIn & social
+    "linkedin.com", "e.linkedin.com",
+    # Cloud providers
+    "notifications.aws.amazon.com",
+    "azure.com",
 }
 
 
