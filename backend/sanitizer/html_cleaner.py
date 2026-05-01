@@ -5,6 +5,12 @@ from bs4 import BeautifulSoup
 _URL_LIKE = re.compile(r"^https?://|^www\.", re.IGNORECASE)
 
 
+def _root_domain(domain: str) -> str:
+    """Return the last two parts of a domain — 'jobs.intel.com' → 'intel.com'."""
+    parts = domain.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else domain
+
+
 def clean_html(html: str) -> str:
     """Strip scripts, styles, tracking pixels and return plain text."""
     soup = BeautifulSoup(html, "lxml")
@@ -46,7 +52,7 @@ def extract_link_mismatches(html: str) -> list[dict]:
         except Exception:
             continue
 
-        if href_domain and text_domain and href_domain != text_domain:
+        if href_domain and text_domain and _root_domain(href_domain) != _root_domain(text_domain):
             mismatches.append({"display": text_domain, "actual": href_domain})
 
     return mismatches
