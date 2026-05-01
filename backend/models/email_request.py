@@ -14,6 +14,7 @@ class EmailHeaders(BaseModel):
 class AttachmentMeta(BaseModel):
     name: str
     mime_type: str
+    sha256: Optional[str] = None
 
 
 class EmailAnalysisRequest(BaseModel):

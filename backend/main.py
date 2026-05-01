@@ -12,6 +12,7 @@ from backend.analyzers.header_analyzer import analyze_headers
 from backend.analyzers.content_analyzer import analyze_content
 from backend.analyzers.url_analyzer import analyze_urls
 from backend.analyzers.attachment_analyzer import analyze_attachments
+from backend.analyzers.virustotal_analyzer import analyze_with_virustotal
 from backend.analyzers.llm_analyzer import analyze_with_llm
 from backend.scoring.aggregator import aggregate
 
@@ -39,8 +40,9 @@ def analyze_email(request: EmailAnalysisRequest) -> EmailAnalysisResponse:
     url_score, url_signals = analyze_urls(sanitized["urls"], sanitized["link_mismatches"])
     attachment_score, attachment_signals = analyze_attachments(sanitized["attachments"])
 
-    rule_score = min(header_score + content_score + url_score + attachment_score, 100)
-    all_rule_signals = header_signals + content_signals + url_signals + attachment_signals
+    vt_score, vt_signals = analyze_with_virustotal(sanitized["attachments"])
+    rule_score = min(header_score + content_score + url_score + attachment_score + vt_score, 100)
+    all_rule_signals = header_signals + content_signals + url_signals + attachment_signals + vt_signals
 
     llm_score, explanation, llm_signals = analyze_with_llm(sanitized)
 

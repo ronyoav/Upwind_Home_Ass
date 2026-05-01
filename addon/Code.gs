@@ -40,7 +40,18 @@ function buildPayload(message, messageId) {
   var cleanSubject = stripPii(message.getSubject());
 
   var attachments = message.getAttachments().map(function(a) {
-    return { name: a.getName(), mime_type: a.getContentType() };
+    var entry = { name: a.getName(), mime_type: a.getContentType() };
+    try {
+      // Only hash files under 5MB to avoid timeout
+      if (a.getSize() <= 5 * 1024 * 1024) {
+        var bytes = a.getBytes();
+        var hashBytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes);
+        entry.sha256 = hashBytes.map(function(b) {
+          return ("0" + (b & 0xFF).toString(16)).slice(-2);
+        }).join("");
+      }
+    } catch (e) {}
+    return entry;
   });
 
   return {
