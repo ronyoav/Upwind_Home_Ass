@@ -44,6 +44,14 @@ _RANSOMWARE_PATTERNS = [
     r"\bbitcoin (wallet|address|payment)\b",
 ]
 
+_QR_PATTERNS = [
+    r"\bscan (this |the )?(qr|q\.r\.?) ?code\b",
+    r"\bpoint your (camera|phone) (at|to)\b",
+    r"\bqr code (below|above|attached)\b",
+    r"\bscan to (verify|login|sign in|confirm|access|pay)\b",
+    r"\buse your (camera|phone) to scan\b",
+]
+
 _SEXTORTION_PATTERNS = [
     r"\bI have (access to|hacked|infected) your (camera|webcam|device|computer)\b",
     r"\bI (recorded|filmed|captured) you\b",
@@ -83,6 +91,11 @@ def analyze_content(body: str, subject: str) -> tuple[int, list[Signal]]:
     if threat_hits >= 1:
         score += 20
         signals.append(Signal(type="threat_language", severity="high", description="Threatening language about account suspension or legal action."))
+
+    qr_hits = _count_matches(text, _QR_PATTERNS)
+    if qr_hits >= 1:
+        score += 20
+        signals.append(Signal(type="qr_code_lure", severity="medium", description="Email requests QR code scan — destination URL is hidden and cannot be verified."))
 
     ransomware_hits = _count_matches(text, _RANSOMWARE_PATTERNS)
     if ransomware_hits >= 1:
