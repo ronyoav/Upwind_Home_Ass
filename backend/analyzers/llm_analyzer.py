@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import anthropic
 from backend.models.email_request import Signal
 
@@ -42,7 +43,11 @@ def analyze_with_llm(sanitized: dict) -> tuple[int, str, list[Signal]]:
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.content[0].text.strip()
-        data = json.loads(raw)
+        # Strip markdown code blocks if Claude wraps the response
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+        data = json.loads(raw.strip())
 
         llm_score = int(data.get("phishing_score", 0))
         explanation = data.get("explanation", "No explanation provided.")
