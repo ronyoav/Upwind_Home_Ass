@@ -4,6 +4,10 @@ from bs4 import BeautifulSoup
 
 _URL_LIKE = re.compile(r"^https?://|^www\.", re.IGNORECASE)
 
+# Base64 strings of 100+ chars are suspicious in email HTML —
+# legitimate emails don't embed long encoded payloads inline.
+_BASE64_RE = re.compile(r"[A-Za-z0-9+/]{100,}={0,2}")
+
 
 def _root_domain(domain: str) -> str:
     """Return the last two parts of a domain — 'jobs.intel.com' → 'intel.com'."""
@@ -25,6 +29,17 @@ def clean_html(html: str) -> str:
             img.decompose()
 
     return soup.get_text(separator=" ", strip=True)
+
+
+def detect_base64_payload(html: str) -> bool:
+    """
+    Returns True if the raw HTML contains suspiciously long base64 strings
+    — a technique used to hide malicious JavaScript from content filters.
+    Runs on raw HTML before sanitization so script tags are still present.
+    """
+    if not html:
+        return False
+    return bool(_BASE64_RE.search(html))
 
 
 def extract_link_mismatches(html: str) -> list[dict]:

@@ -1,4 +1,4 @@
-from .html_cleaner import clean_html, extract_link_mismatches
+from .html_cleaner import clean_html, extract_link_mismatches, detect_base64_payload
 from .pii_stripper import strip_pii, strip_url_pii, strip_prompt_injection
 from .content_minimizer import minimize
 from backend.models.email_request import EmailAnalysisRequest
@@ -12,7 +12,9 @@ def sanitize(request: EmailAnalysisRequest) -> dict:
     """
     raw_text = request.body_text or ""
     link_mismatches = []
+    has_base64_payload = False
     if request.body_html:
+        has_base64_payload = detect_base64_payload(request.body_html)
         raw_text = clean_html(request.body_html)
         link_mismatches = extract_link_mismatches(request.body_html)
 
@@ -28,4 +30,5 @@ def sanitize(request: EmailAnalysisRequest) -> dict:
         "urls": clean_urls,
         "attachments": request.attachments,
         "link_mismatches": link_mismatches,
+        "has_base64_payload": has_base64_payload,
     }
