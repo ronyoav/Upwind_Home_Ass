@@ -32,7 +32,12 @@ function buildPayload(message, messageId) {
 
   var bodyHtml = message.getBody();
   var bodyText = message.getPlainBody();
-  var urls     = extractUrls(bodyHtml || bodyText);
+
+  // Client-side cleanup before leaving the browser
+  var cleanHtml = removeTrackingPixels(bodyHtml);
+  var urls      = extractUrls(cleanHtml || bodyText).map(stripUrlPii);
+  var cleanBody = stripPii(bodyText || "");
+  var cleanSubject = stripPii(message.getSubject());
 
   var attachments = message.getAttachments().map(function(a) {
     return { name: a.getName(), mime_type: a.getContentType() };
@@ -40,7 +45,7 @@ function buildPayload(message, messageId) {
 
   return {
     message_id: messageId,
-    subject: message.getSubject(),
+    subject: cleanSubject,
     headers: {
       spf: spf,
       dkim: dkim,
@@ -49,12 +54,15 @@ function buildPayload(message, messageId) {
       reply_to: rawHeaders["reply-to"] || null,
       received_from: rawHeaders["received"] || null,
     },
-    body_html: bodyHtml,
-    body_text: bodyText,
+    body_html: cleanHtml,
+    body_text: cleanBody,
     urls: urls,
     attachments: attachments,
   };
 }
+
+var HEALTH_URL = "https://upwind-home-ass.onrender.com/health";
+var MAX_RETRIES = 3;
 
 function callBackend(payload) {
   var options = {
@@ -64,14 +72,29 @@ function callBackend(payload) {
     muteHttpExceptions: true,
   };
 
-  var response = UrlFetchApp.fetch(BACKEND_URL, options);
-  var code = response.getResponseCode();
+  // Warm up the server before the main request
+  try {
+    UrlFetchApp.fetch(HEALTH_URL, { muteHttpExceptions: true });
+  } catch (e) {}
 
-  if (code !== 200) {
-    throw new Error("Backend returned HTTP " + code);
+  for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      var response = UrlFetchApp.fetch(BACKEND_URL, options);
+      var code = response.getResponseCode();
+
+      if (code === 200) {
+        return JSON.parse(response.getContentText());
+      }
+
+      if (attempt === MAX_RETRIES) {
+        throw new Error("Backend returned HTTP " + code);
+      }
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+    }
+
+    Utilities.sleep(2000 * attempt);
   }
-
-  return JSON.parse(response.getContentText());
 }
 
 function extractAuthValue(authResults, protocol) {
@@ -84,6 +107,33 @@ function extractUrls(text) {
   if (!text) return [];
   var re = /https?:\/\/[^\s"'<>]+/gi;
   var matches = text.match(re) || [];
-  // Deduplicate and limit to 30
   return [...new Set(matches)].slice(0, 30);
+}
+
+function stripPii(text) {
+  if (!text) return "";
+  // Credit cards
+  text = text.replace(/\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g, "[CREDIT_CARD]");
+  // SSN
+  text = text.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[SSN]");
+  // Phone numbers
+  text = text.replace(/\b(\+?1[\s\-]?)?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}\b/g, "[PHONE_NUMBER]");
+  // Israeli phone numbers
+  text = text.replace(/\b0[5-9]\d[\-\s]?\d{7}\b/g, "[PHONE_NUMBER]");
+  // Israeli ID (9 digits)
+  text = text.replace(/\b\d{9}\b/g, "[ID_NUMBER]");
+  // Street addresses
+  text = text.replace(/\b\d{1,5}\s+[A-Za-z\s]{3,30}(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr)\b/gi, "[PHYSICAL_ADDRESS]");
+  return text;
+}
+
+function removeTrackingPixels(html) {
+  if (!html) return "";
+  // Remove 1x1 pixel images used for tracking
+  return html.replace(/<img[^>]*(width=["']?1["']?|height=["']?1["']?)[^>]*\/?>/gi, "");
+}
+
+function stripUrlPii(url) {
+  // Redact common PII query parameters from tracking URLs
+  return url.replace(/([?&])(email|mail|user|name|fname|lname|first_name|last_name|recipient|uid|userid|user_id|contact)=([^&]*)/gi, "$1$2=[REDACTED]");
 }
