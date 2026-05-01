@@ -81,7 +81,21 @@ def analyze_headers(headers: EmailHeaders) -> tuple[int, list[Signal]]:
                 description=f"Reply-To domain ({reply_domain}) differs from From domain ({from_domain}).",
             ))
 
-    # Lookalike domain check
+    # Display name spoofing: "PayPal <attacker@gmail.com>"
+    if headers.from_address:
+        display_name = _extract_display_name(headers.from_address)
+        actual_domain = _extract_domain(headers.from_address)
+        if display_name and actual_domain:
+            spoofed_brand = _spoofed_brand(display_name, actual_domain)
+            if spoofed_brand:
+                score += 35
+                signals.append(Signal(
+                    type="display_name_spoofing",
+                    severity="high",
+                    description=f"Display name claims to be '{spoofed_brand}' but email is sent from '{actual_domain}'.",
+                ))
+
+    # Lookalike / homoglyph domain check
     if headers.from_address:
         domain = _extract_domain(headers.from_address)
         if domain and _is_lookalike(domain):
@@ -89,7 +103,7 @@ def analyze_headers(headers: EmailHeaders) -> tuple[int, list[Signal]]:
             signals.append(Signal(
                 type="lookalike_domain",
                 severity="high",
-                description=f"Sender domain '{domain}' resembles a well-known brand but is not legitimate.",
+                description=f"Sender domain '{domain}' resembles a well-known brand (possible homoglyph or typosquat).",
             ))
 
     return min(score, 100), signals
@@ -100,7 +114,13 @@ def _extract_domain(address: str) -> str | None:
     return match.group(1).lower() if match else None
 
 
-# Known brands and their legitimate domains
+def _extract_display_name(address: str) -> str | None:
+    """Extract the human-readable name from 'Name <email@domain.com>'."""
+    match = re.match(r'^"?([^"<]+)"?\s*<', address.strip())
+    return match.group(1).strip().lower() if match else None
+
+
+# Known brands: display-name keyword → legitimate sending domain
 _KNOWN_BRANDS = {
     "paypal": "paypal.com",
     "amazon": "amazon.com",
@@ -110,18 +130,33 @@ _KNOWN_BRANDS = {
     "netflix": "netflix.com",
     "facebook": "facebook.com",
     "instagram": "instagram.com",
-    "bank": None,
     "chase": "chase.com",
     "wellsfargo": "wellsfargo.com",
+    "bank of america": "bankofamerica.com",
+    "linkedin": "linkedin.com",
 }
 
 
+def _spoofed_brand(display_name: str, actual_domain: str) -> str | None:
+    """Return brand name if display name claims a known brand but domain doesn't match."""
+    for brand, legit_domain in _KNOWN_BRANDS.items():
+        if brand in display_name and not actual_domain.endswith(legit_domain):
+            return brand
+    return None
+
+
 def _is_lookalike(domain: str) -> bool:
-    domain_lower = domain.lower()
+    # Normalize unicode homoglyphs (Cyrillic/Greek → ASCII lookalikes)
+    normalized = (
+        domain
+        .replace("а", "a").replace("е", "e").replace("о", "o")   # Cyrillic
+        .replace("р", "p").replace("с", "c").replace("х", "x")
+        .replace("ο", "o").replace("ν", "v")                      # Greek
+    )
     for brand, legit in _KNOWN_BRANDS.items():
-        if brand in domain_lower and domain_lower != legit:
+        if brand.split()[0] in normalized and normalized != legit:
             return True
-    # Homoglyph / typosquat heuristic: digits substituting letters
-    if re.search(r"(pay[p\d]a[l1]|g[o0]{2}gle|micr[o0]s[o0]ft|app[l1]e)", domain_lower):
+    # Digit-substitution typosquats
+    if re.search(r"(pay[p\d]a[l1]|g[o0]{2}gle|micr[o0]s[o0]ft|app[l1]e|amaz[o0]n)", normalized):
         return True
     return False
