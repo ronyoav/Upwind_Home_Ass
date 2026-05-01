@@ -12,8 +12,17 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 │  • Client-side PII stripping (SSN, credit cards)    │
 │  • Tracking pixel removal                           │
 │  • URL extraction + PII redaction                   │
+│  • SHA-256 hash of attachments (≤5MB)               │
 └────────────────────┬────────────────────────────────┘
                      │ POST /api/v1/analyze
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│          VirusTotal Attachment Lookup               │
+│  Runs on raw request — before sanitizer strips      │
+│  <object>/<embed> tags that carry file references   │
+│  SHA-256 → VT API → 70+ AV engines                  │
+└────────────────────┬────────────────────────────────┘
+                     │
                      ▼
 ┌─────────────────────────────────────────────────────┐
 │              Sanitizer Pipeline                     │
@@ -157,6 +166,10 @@ LLM calls are the only expensive operation (~500ms, ~$0.001 each). Identical ema
 ### Why VirusTotal for attachments?
 
 Attachment content is never opened or executed. We compute a SHA-256 hash client-side in the Gmail Add-on and look it up against VirusTotal's database of 70+ antivirus engines. This gives threat-intel coverage without running untrusted code. If the hash is unknown (not in VT database), no penalty is applied — absence of evidence is not evidence of malice.
+
+### Why does VirusTotal run before the sanitizer?
+
+The sanitizer strips `<object>` and `<embed>` HTML tags, which some email clients use to reference embedded file attachments. Running VirusTotal on the raw request (before sanitization) ensures no attachment reference is lost before the hash lookup. The sanitizer may then safely strip these tags for the LLM and content analyzers.
 
 ### Why client-side PII stripping?
 

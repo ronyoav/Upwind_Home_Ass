@@ -33,6 +33,9 @@ def health():
 
 @app.post("/api/v1/analyze", response_model=EmailAnalysisResponse)
 def analyze_email(request: EmailAnalysisRequest) -> EmailAnalysisResponse:
+    # VirusTotal runs on raw attachments before the sanitizer strips <object>/<embed> tags
+    vt_score, vt_signals = analyze_with_virustotal(request.attachments)
+
     sanitized = sanitize(request)
 
     header_score, header_signals = analyze_headers(sanitized["headers"])
@@ -44,8 +47,6 @@ def analyze_email(request: EmailAnalysisRequest) -> EmailAnalysisResponse:
 
     url_score, url_signals = analyze_urls(sanitized["urls"], sanitized["link_mismatches"], sanitized["has_base64_payload"], sender_domain)
     attachment_score, attachment_signals = analyze_attachments(sanitized["attachments"])
-
-    vt_score, vt_signals = analyze_with_virustotal(sanitized["attachments"])
     rule_score = min(header_score + content_score + url_score + attachment_score + vt_score, 100)
     all_rule_signals = header_signals + content_signals + url_signals + attachment_signals + vt_signals
 
