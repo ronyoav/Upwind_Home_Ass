@@ -171,6 +171,10 @@ def _spoofed_brand(display_name: str, actual_domain: str) -> str | None:
 
 
 def _is_lookalike(domain: str) -> bool:
+    # Skip exact legitimate domains immediately
+    if domain in _KNOWN_BRANDS.values():
+        return False
+
     # Normalize unicode homoglyphs (Cyrillic/Greek → ASCII lookalikes)
     normalized = (
         domain
@@ -181,7 +185,8 @@ def _is_lookalike(domain: str) -> bool:
     for brand, legit in _KNOWN_BRANDS.items():
         if brand.split()[0] in normalized and normalized != legit:
             return True
-    # Digit-substitution typosquats
+    # Digit-substitution typosquats — only fire if NOT a legit domain
     if re.search(r"(pay[p\d]a[l1]|g[o0]{2}gle|micr[o0]s[o0]ft|app[l1]e|amaz[o0]n)", normalized):
-        return True
+        if normalized not in _KNOWN_BRANDS.values():
+            return True
     return False
