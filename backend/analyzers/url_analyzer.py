@@ -21,6 +21,10 @@ _PHISHING_KEYWORDS = re.compile(
 
 _IP_URL_RE = re.compile(r"https?://\d{1,3}(\.\d{1,3}){3}")
 
+_REDIRECT_PARAMS = re.compile(r"[?&](redirect|url|next|return|goto|target|dest|destination|continue)=", re.IGNORECASE)
+
+_URL_LENGTH_THRESHOLD = 100
+
 # Mock domain reputation DB — in production this would be a threat-intel feed.
 _BAD_DOMAINS = {
     "evil.com", "phish.net", "malware-site.ru", "stealcreds.tk",
@@ -30,7 +34,7 @@ _BAD_DOMAINS = {
 }
 
 
-def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None, has_base64_payload: bool = False) -> tuple[int, list[Signal]]:
+def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None, has_base64_payload: bool = False, sender_domain: str | None = None) -> tuple[int, list[Signal]]:
     score = 0
     signals = []
 
@@ -72,6 +76,34 @@ def analyze_urls(urls: list[str], link_mismatches: list[dict] | None = None, has
                 type="phishing_keyword_domain",
                 severity="medium",
                 description=f"Domain '{example}' contains keywords commonly used in phishing URLs (secure, login, verify, drive, etc.).",
+            ))
+
+        long_urls = [u for u in urls if len(u) > _URL_LENGTH_THRESHOLD]
+        if long_urls:
+            score += 10
+            signals.append(Signal(
+                type="long_url",
+                severity="low",
+                description=f"Unusually long URL detected ({len(long_urls[0])} chars) — may indicate obfuscation.",
+            ))
+
+        redirect_urls = [u for u in urls if _REDIRECT_PARAMS.search(u)]
+        if redirect_urls:
+            score += 15
+            signals.append(Signal(
+                type="redirect_param",
+                severity="medium",
+                description="URL contains redirect parameter (redirect=, url=, next=) — final destination may be hidden.",
+            ))
+
+    if sender_domain and urls:
+        external = [u for u in urls if _is_external_to_sender(u, sender_domain)]
+        if external:
+            score += 15
+            signals.append(Signal(
+                type="external_domain",
+                severity="medium",
+                description=f"Email from '{sender_domain}' contains links pointing to unrelated external domains.",
             ))
 
     if has_base64_payload:
@@ -121,6 +153,15 @@ def _is_bad_domain(url: str) -> bool:
 def _has_phishing_keywords(url: str) -> bool:
     domain = _extract_domain(url)
     return bool(_PHISHING_KEYWORDS.search(domain)) if domain else False
+
+
+def _is_external_to_sender(url: str, sender_domain: str) -> bool:
+    url_domain = _extract_domain(url)
+    if not url_domain:
+        return False
+    sender_root = ".".join(sender_domain.split(".")[-2:])
+    url_root = ".".join(url_domain.split(".")[-2:])
+    return url_root != sender_root
 
 
 def _extract_domain(url: str) -> str | None:
