@@ -437,3 +437,5 @@ env
 venv/
 .venv/
 .env
+.mcp.json
+.claude/

@@ -1,17 +1,21 @@
 var _SIGNAL_GROUPS = {
   "Headers & Sender": [
     "spf_fail", "spf_missing", "dkim_fail", "dkim_missing", "dmarc_fail",
-    "reply_to_mismatch", "lookalike_domain", "display_name_spoofing"
+    "reply_to_mismatch", "display_name_spoofing", "lookalike_domain"
   ],
   "Content": [
-    "urgency_language", "credential_phishing", "financial_lure", "threat_language"
+    "urgency_language", "credential_phishing", "financial_lure", "threat_language",
+    "qr_code_lure", "captcha_lure", "ransomware", "sextortion"
   ],
   "Links & URLs": [
     "url_shortener", "suspicious_tld", "ip_url", "http_url",
-    "known_bad_domain", "link_text_mismatch"
+    "known_bad_domain", "phishing_keyword_domain", "long_url",
+    "redirect_param", "external_domain", "link_text_mismatch", "base64_payload"
   ],
   "Attachments": [
-    "dangerous_attachment", "suspicious_attachment"
+    "dangerous_attachment", "suspicious_attachment",
+    "double_extension", "mime_mismatch",
+    "virustotal_malicious", "virustotal_suspicious"
   ],
   "AI Analysis": [
     "llm_intent", "llm_impersonation", "llm_urgency", "llm_suspicious_elements"
@@ -81,16 +85,14 @@ function buildCard(result) {
 
   // Grouped signals
   if (signals.length > 0) {
-    var result = _groupSignals(signals);
-    var grouped = result.grouped;
+    var grouped = _groupSignals(signals).grouped;
 
     for (var groupName in _SIGNAL_GROUPS) {
       var groupSignals = grouped[groupName];
       if (!groupSignals || groupSignals.length === 0) continue;
 
-      var groupIcon    = _groupIcon(groupSignals);
       var groupSection = CardService.newCardSection()
-        .setHeader(groupIcon + "  " + groupName)
+        .setHeader(_groupIcon(groupSignals) + "  " + groupName)
         .setCollapsible(true)
         .setNumUncollapsibleWidgets(groupSignals.length);
 
