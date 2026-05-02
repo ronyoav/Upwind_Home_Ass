@@ -74,28 +74,28 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 
 ## What We Check — Quick Reference
 
-| # | Signal | מה אנחנו רואים | מה זה אומר |
-|---|--------|----------------|------------|
-| 1 | `spf_fail` | SPF=fail בהדר | שרת השליחה לא מורשה לשלוח מהדומיין הזה |
-| 2 | `dkim_fail` | DKIM=fail | המייל שונה אחרי השליחה, או חתימה מזויפת |
-| 3 | `dmarc_fail` | DMARC=fail | הדומיין הכריז שיש לדחות מיילים כאלה |
-| 4 | `reply_to_mismatch` | From: bank.com / Reply-To: evil.com | תשובה תלך לאפיק שונה מהשולח |
-| 5 | `display_name_spoofing` | "PayPal" \<attacker@gmail.com\> | שם תצוגה מתחזה לברנד, כתובת אמיתית אחרת |
-| 6 | `lookalike_domain` | arnazon.com, paypa1.com, miсrosoft.com | typosquat / homoglyph של ברנד ידוע |
-| 7 | `link_text_mismatch` | מציג "google.com" → href ל-evil.ru | המשתמש רואה לינק אחד, לוחץ על אחר |
-| 8 | `url_shortener` | bit.ly, tinyurl | היעד האמיתי מוסתר |
-| 9 | `suspicious_tld` | .xyz, .top, .click, .tk | TLDs נפוצים בתשתיות phishing |
-| 10 | `ip_url` | http://185.23.4.1/login | אין דומיין לגיטימי, מסתיר מיהו השרת |
-| 11 | `base64_payload` | HTML עם base64 ארוך | JS זדוני מוסתר מסורקים |
-| 12 | `credential_phishing` | "confirm your details", "verify your account" | בקשה לפרטי כניסה |
-| 13 | `urgency_language` | "act now", "expires in 24h" | לחץ שימנע חשיבה |
-| 14 | `financial_lure` | gift card, bitcoin, lottery | פיתיון כספי |
-| 15 | `ransomware` | "your files are encrypted", "pay to recover" | איום כופר |
-| 16 | `sextortion` | "I recorded you", "pay or I'll share" | סחיטה בחומר מביך |
-| 17 | `double_extension` | invoice.pdf.exe | נראה כמסמך, מריץ קוד |
-| 18 | `mime_mismatch` | סיומת .pdf, MIME: application/javascript | הקובץ אינו מה שהוא טוען להיות |
-| 19 | `dangerous_attachment` | .exe, .ps1, .iso, .hta | קובץ שמריץ קוד ישירות |
-| 20 | `virustotal_malicious` | sha256 ידוע ל-VT | 3+ מנועי AV מכירים את הקובץ |
+| # | Signal | What we observe | What it means |
+|---|--------|-----------------|---------------|
+| 1 | `spf_fail` | SPF=fail in header | Sending server is not authorized to send from this domain |
+| 2 | `dkim_fail` | DKIM=fail | Email was modified after sending, or signature is forged |
+| 3 | `dmarc_fail` | DMARC=fail | Domain policy explicitly rejects this message |
+| 4 | `reply_to_mismatch` | From: bank.com / Reply-To: evil.com | Replies go to a different party than the apparent sender |
+| 5 | `display_name_spoofing` | "PayPal" \<attacker@gmail.com\> | Display name impersonates a brand; actual address is unrelated |
+| 6 | `lookalike_domain` | arnazon.com, paypa1.com, miсrosoft.com | Typosquat or homoglyph of a known brand |
+| 7 | `link_text_mismatch` | Shows "google.com" → href points to evil.ru | User sees one link, clicks another |
+| 8 | `url_shortener` | bit.ly, tinyurl | True destination is hidden |
+| 9 | `suspicious_tld` | .xyz, .top, .click, .tk | TLDs commonly used in phishing infrastructure |
+| 10 | `ip_url` | http://185.23.4.1/login | No legitimate domain — hides who owns the server |
+| 11 | `base64_payload` | Long base64 string in HTML body | Malicious JS hidden from content scanners |
+| 12 | `credential_phishing` | "confirm your details", "verify your account" | Email requests login credentials or personal verification |
+| 13 | `urgency_language` | "act now", "expires in 24h" | Pressure designed to bypass critical thinking |
+| 14 | `financial_lure` | gift card, bitcoin, lottery | Financial bait to manipulate the recipient |
+| 15 | `ransomware` | "your files are encrypted", "pay to recover" | Ransom demand — files held hostage |
+| 16 | `sextortion` | "I recorded you", "pay or I'll share" | Extortion using fabricated or stolen compromising material |
+| 17 | `double_extension` | invoice.pdf.exe | Looks like a document, executes as code |
+| 18 | `mime_mismatch` | Extension .pdf, MIME: application/javascript | File is not what its extension claims |
+| 19 | `dangerous_attachment` | .exe, .ps1, .iso, .hta | File type that directly executes code |
+| 20 | `virustotal_malicious` | SHA-256 known to VirusTotal | 3+ AV engines have flagged this exact file |
 
 ---
 
