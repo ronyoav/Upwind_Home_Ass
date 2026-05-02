@@ -72,6 +72,33 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 
 ---
 
+## What We Check — Quick Reference
+
+| # | Signal | מה אנחנו רואים | מה זה אומר |
+|---|--------|----------------|------------|
+| 1 | `spf_fail` | SPF=fail בהדר | שרת השליחה לא מורשה לשלוח מהדומיין הזה |
+| 2 | `dkim_fail` | DKIM=fail | המייל שונה אחרי השליחה, או חתימה מזויפת |
+| 3 | `dmarc_fail` | DMARC=fail | הדומיין הכריז שיש לדחות מיילים כאלה |
+| 4 | `reply_to_mismatch` | From: bank.com / Reply-To: evil.com | תשובה תלך לאפיק שונה מהשולח |
+| 5 | `display_name_spoofing` | "PayPal" \<attacker@gmail.com\> | שם תצוגה מתחזה לברנד, כתובת אמיתית אחרת |
+| 6 | `lookalike_domain` | arnazon.com, paypa1.com, miсrosoft.com | typosquat / homoglyph של ברנד ידוע |
+| 7 | `link_text_mismatch` | מציג "google.com" → href ל-evil.ru | המשתמש רואה לינק אחד, לוחץ על אחר |
+| 8 | `url_shortener` | bit.ly, tinyurl | היעד האמיתי מוסתר |
+| 9 | `suspicious_tld` | .xyz, .top, .click, .tk | TLDs נפוצים בתשתיות phishing |
+| 10 | `ip_url` | http://185.23.4.1/login | אין דומיין לגיטימי, מסתיר מיהו השרת |
+| 11 | `base64_payload` | HTML עם base64 ארוך | JS זדוני מוסתר מסורקים |
+| 12 | `credential_phishing` | "confirm your details", "verify your account" | בקשה לפרטי כניסה |
+| 13 | `urgency_language` | "act now", "expires in 24h" | לחץ שימנע חשיבה |
+| 14 | `financial_lure` | gift card, bitcoin, lottery | פיתיון כספי |
+| 15 | `ransomware` | "your files are encrypted", "pay to recover" | איום כופר |
+| 16 | `sextortion` | "I recorded you", "pay or I'll share" | סחיטה בחומר מביך |
+| 17 | `double_extension` | invoice.pdf.exe | נראה כמסמך, מריץ קוד |
+| 18 | `mime_mismatch` | סיומת .pdf, MIME: application/javascript | הקובץ אינו מה שהוא טוען להיות |
+| 19 | `dangerous_attachment` | .exe, .ps1, .iso, .hta | קובץ שמריץ קוד ישירות |
+| 20 | `virustotal_malicious` | sha256 ידוע ל-VT | 3+ מנועי AV מכירים את הקובץ |
+
+---
+
 ## Signal Types
 
 | Category | Signal | Severity | Score |
@@ -105,6 +132,8 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 | | `base64_payload` — HTML contains long base64-encoded content (hides malicious scripts) | High | +30 |
 | **Attachments** | `dangerous_attachment` — .exe, .js, .vbs, .bat, .ps1, .iso, .jar | High | +40 |
 | | `suspicious_attachment` — .pdf, .doc, .docm, .xlsm, .ppt (macro risk) | Medium | +15 |
+| | `double_extension` — invoice.pdf.exe (looks like doc, runs as code) | High | +40 |
+| | `mime_mismatch` — extension says .pdf, MIME type says application/javascript | High | +35 |
 | | `virustotal_malicious` — SHA-256 flagged malicious by 3+ AV engines | High | +50 |
 | | `virustotal_suspicious` — SHA-256 flagged suspicious by 1+ AV engines | Medium | +25 |
 | **AI Analysis** | `llm_intent` — credential harvesting / financial fraud / malware delivery | High | +35–40 |

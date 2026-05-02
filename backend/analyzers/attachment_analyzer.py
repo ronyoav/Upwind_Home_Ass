@@ -1,3 +1,4 @@
+import os
 from backend.models.email_request import AttachmentMeta, Signal
 
 _HIGH_RISK_EXTENSIONS = {
@@ -30,6 +31,23 @@ _MEDIUM_RISK_MIME_TYPES = {
     "application/rtf",
 }
 
+# Expected MIME types per extension — used to catch disguised files (e.g. invoice.pdf served as application/javascript)
+_EXPECTED_MIME = {
+    ".pdf":  {"application/pdf"},
+    ".jpg":  {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".png":  {"image/png"},
+    ".gif":  {"image/gif"},
+    ".txt":  {"text/plain"},
+    ".zip":  {"application/zip", "application/x-zip-compressed"},
+    ".doc":  {"application/msword"},
+    ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    ".xls":  {"application/vnd.ms-excel"},
+    ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    ".ppt":  {"application/vnd.ms-powerpoint"},
+    ".pptx": {"application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+}
+
 
 def analyze_attachments(attachments: list[AttachmentMeta]) -> tuple[int, list[Signal]]:
     if not attachments:
@@ -59,6 +77,27 @@ def analyze_attachments(attachments: list[AttachmentMeta]) -> tuple[int, list[Si
             description=f"Office/PDF attachment(s) may contain macros or exploits: {names}.",
         ))
 
+    double_ext = [a for a in attachments if _has_double_extension(a)]
+    if double_ext:
+        score += 40
+        names = ", ".join(a.name for a in double_ext[:3])
+        signals.append(Signal(
+            type="double_extension",
+            severity="high",
+            description=f"Attachment has a dangerous hidden extension: {names} — may appear as a document but executes as code.",
+        ))
+
+    mime_mismatch = [a for a in attachments if _has_mime_mismatch(a)]
+    if mime_mismatch:
+        score += 35
+        a = mime_mismatch[0]
+        ext = os.path.splitext(a.name.lower())[1]
+        signals.append(Signal(
+            type="mime_mismatch",
+            severity="high",
+            description=f"'{a.name}' has extension '{ext}' but MIME type '{a.mime_type}' — file is not what it claims to be.",
+        ))
+
     return min(score, 100), signals
 
 
@@ -76,3 +115,21 @@ def _is_medium_risk(a: AttachmentMeta) -> bool:
         any(lower.endswith(ext) for ext in _MEDIUM_RISK_EXTENSIONS)
         or a.mime_type in _MEDIUM_RISK_MIME_TYPES
     )
+
+
+def _has_double_extension(a: AttachmentMeta) -> bool:
+    """Catches invoice.pdf.exe — the outer extension is dangerous, inner fakes legitimacy."""
+    parts = a.name.lower().split(".")
+    if len(parts) < 3:
+        return False
+    outer_ext = "." + parts[-1]
+    return outer_ext in _HIGH_RISK_EXTENSIONS
+
+
+def _has_mime_mismatch(a: AttachmentMeta) -> bool:
+    """Catches files where extension implies a safe type but MIME type is dangerous."""
+    ext = os.path.splitext(a.name.lower())[1]
+    expected = _EXPECTED_MIME.get(ext)
+    if not expected:
+        return False
+    return a.mime_type not in expected and a.mime_type in _HIGH_RISK_MIME_TYPES
