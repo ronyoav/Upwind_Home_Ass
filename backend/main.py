@@ -1,4 +1,6 @@
 import os
+import re
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,24 +35,35 @@ def health():
 
 @app.post("/api/v1/analyze", response_model=EmailAnalysisResponse)
 def analyze_email(request: EmailAnalysisRequest) -> EmailAnalysisResponse:
-    # VirusTotal runs on raw attachments before the sanitizer strips <object>/<embed> tags
-    vt_score, vt_signals = analyze_with_virustotal(request.attachments)
+    # Phase 1: sanitize + VirusTotal in parallel.
+    # VT only needs the sha256 hash sent by the Add-on — independent of sanitizer output.
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        sanitize_f = ex.submit(sanitize, request)
+        vt_f = ex.submit(analyze_with_virustotal, request.attachments)
+    sanitized = sanitize_f.result()
+    vt_score, vt_signals = vt_f.result()
 
-    sanitized = sanitize(request)
-
-    header_score, header_signals = analyze_headers(sanitized["headers"])
-    content_score, content_signals = analyze_content(sanitized["body"], sanitized["subject"])
+    # Phase 2: all rule-based analyzers + LLM in parallel — all depend on sanitized.
     sender_domain = None
     if sanitized["headers"].from_address:
-        match = __import__("re").search(r"@([\w.\-]+)", sanitized["headers"].from_address)
+        match = re.search(r"@([\w.\-]+)", sanitized["headers"].from_address)
         sender_domain = match.group(1).lower() if match else None
 
-    url_score, url_signals = analyze_urls(sanitized["urls"], sanitized["link_mismatches"], sanitized["has_base64_payload"], sender_domain)
-    attachment_score, attachment_signals = analyze_attachments(sanitized["attachments"])
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        header_f = ex.submit(analyze_headers, sanitized["headers"])
+        content_f = ex.submit(analyze_content, sanitized["body"], sanitized["subject"])
+        url_f = ex.submit(analyze_urls, sanitized["urls"], sanitized["link_mismatches"], sanitized["has_base64_payload"], sender_domain)
+        attachment_f = ex.submit(analyze_attachments, sanitized["attachments"])
+        llm_f = ex.submit(analyze_with_llm, sanitized)
+
+    header_score, header_signals = header_f.result()
+    content_score, content_signals = content_f.result()
+    url_score, url_signals = url_f.result()
+    attachment_score, attachment_signals = attachment_f.result()
+    llm_score, explanation, llm_signals = llm_f.result()
+
     rule_score = min(header_score + content_score + url_score + attachment_score + vt_score, 100)
     all_rule_signals = header_signals + content_signals + url_signals + attachment_signals + vt_signals
-
-    llm_score, explanation, llm_signals = analyze_with_llm(sanitized)
 
     final_score, verdict, verdict_label = aggregate(rule_score, llm_score, all_rule_signals)
     all_signals = all_rule_signals + llm_signals

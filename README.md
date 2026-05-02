@@ -12,64 +12,46 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 │  • Client-side PII stripping (SSN, credit cards)    │
 │  • Tracking pixel removal                           │
 │  • URL extraction + PII redaction                   │
-│  • SHA-256 hash of attachments (≤5MB)               │
+│  • SHA-256 hash of attachments (≤5MB, not the file) │
 └────────────────────┬────────────────────────────────┘
                      │ POST /api/v1/analyze
+                     │ { subject, headers, body_html,
+                     │   urls, attachments[{name,mime,sha256}] }
                      ▼
-┌─────────────────────────────────────────────────────┐
-│          VirusTotal Attachment Lookup               │
-│  Runs on raw request — before sanitizer strips      │
-│  <object>/<embed> tags that carry file references   │
-│  SHA-256 → VT API → 70+ AV engines                  │
-└────────────────────┬────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────┐
-│              Sanitizer Pipeline                     │
-│  HTML cleaner → PII stripper →                      │
-│  Prompt injection filter → Content minimizer        │
-│  Link mismatch extractor · Base64 payload detector  │
-└──────┬──────────────────────────────────────────────┘
-       │
-       ├─────────────────────────────────────────────────┐
-       │              Rule Engine (70%)                  │
-       │                                                 │
-       │  ┌──────────────────┐  ┌─────────────────────┐  │
-       │  │     Headers      │  │      Content        │  │
-       │  │  SPF/DKIM/DMARC  │  │  Urgency · Creds    │  │
-       │  │  Reply-To spoof  │  │  Financial · Threats│  │
-       │  │  Display name    │  │  Ransomware · QR    │  │
-       │  │  Lookalike domain│  │  CAPTCHA · Sextortion│  │
-       │  │  (homoglyph/typo)│  └─────────────────────┘  │
-       │  └──────────────────┘                           │
-       │  ┌──────────────────┐  ┌─────────────────────┐  │
-       │  │      URLs        │  │    Attachments      │  │
-       │  │  Shorteners      │  │  High-risk (exe/iso)│  │
-       │  │  Bad domains     │  │  Medium (PDF/Office)│  │
-       │  │  text≠href       │  │  VirusTotal hash    │  │
-       │  │  IP URLs         │  │  lookup (SHA-256)   │  │
-       │  │  Phishing keywords│ └─────────────────────┘  │
-       │  │  Redirect params │                           │
-       │  │  Base64 payload  │                           │
-       │  └──────────────────┘                           │
-       └─────────────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────────────┐
-│           LLM Analyzer — Claude Haiku (30%)         │
-│                                                     │
-│  Redis Cache (TTL 1h)                               │
-│    hit  → return cached result                      │
-│    miss → call API → validate schema → cache        │
-│                                                     │
-│  Extracts: intent · impersonation · urgency · tone  │
-│  Schema validation: Pydantic (LLM cannot inflate    │
-│  score directly — rule engine scores the features)  │
-│                                                     │
-│  Prompt injection hardened: system prompt explicitly│
-│  instructs model to treat email content as data,    │
-│  not instructions                                   │
-└─────────────────────────────────────────────────────┘
+       ┌─────────────────────────────────────────┐
+       │  Backend — parallel execution           │
+       │                                         │
+       ├──────────────┬──────────────────────────┤
+       │              │                          │
+       ▼              ▼                          ▼
+┌────────────┐ ┌────────────────┐       ┌───────────────┐
+│ Sanitizer  │ │  VirusTotal    │       │  (waits for   │
+│ HTML clean │ │  sha256 →      │       │   sanitizer)  │
+│ PII strip  │ │  VT API →      │       └───────────────┘
+│ Link mis-  │ │  70+ AV engines│
+│ match      │ └───────┬────────┘
+│ Base64     │         │
+└─────┬──────┘         │
+      │                │
+      └────────┬───────┘
+               ▼
+  ┌────────────────────────────────────────────────┐
+  │  Rule Engine + LLM — parallel execution        │
+  │                                                │
+  │  ┌────────────┐  ┌──────────┐  ┌───────────┐  │
+  │  │  Headers   │  │ Content  │  │   URLs    │  │
+  │  │ SPF/DKIM   │  │ Urgency  │  │ Shortener │  │
+  │  │ DMARC      │  │ Creds    │  │ Bad domain│  │
+  │  │ Spoofing   │  │ Financial│  │ text≠href │  │
+  │  │ Lookalike  │  │ Ransom   │  │ Base64    │  │
+  │  └────────────┘  │ QR/CAPTCHA  └───────────┘  │
+  │                  │ Sextortion│                 │
+  │  ┌────────────┐  └──────────┘  ┌───────────┐  │
+  │  │Attachments │                │    LLM    │  │
+  │  │ exe/iso    │                │  Haiku    │  │
+  │  │ PDF/Office │                │  (cached) │  │
+  │  └────────────┘                └───────────┘  │
+  └────────────────────────────────────────────────┘
        │
        ▼
 ┌─────────────────────────────────────────────────────┐
@@ -167,9 +149,9 @@ LLM calls are the only expensive operation (~500ms, ~$0.001 each). Identical ema
 
 Attachment content is never opened or executed. We compute a SHA-256 hash client-side in the Gmail Add-on and look it up against VirusTotal's database of 70+ antivirus engines. This gives threat-intel coverage without running untrusted code. If the hash is unknown (not in VT database), no penalty is applied — absence of evidence is not evidence of malice.
 
-### Why does VirusTotal run before the sanitizer?
+### Why does VirusTotal run in parallel with the sanitizer?
 
-The sanitizer strips `<object>` and `<embed>` HTML tags, which some email clients use to reference embedded file attachments. Running VirusTotal on the raw request (before sanitization) ensures no attachment reference is lost before the hash lookup. The sanitizer may then safely strip these tags for the LLM and content analyzers.
+VirusTotal only needs the SHA-256 hash that the Add-on already computed client-side — it is completely independent of the sanitizer output. Both run in parallel (Phase 1), and their results are combined before the rule engine runs (Phase 2). This cuts total latency by the duration of whichever is slower.
 
 ### Why client-side PII stripping?
 
