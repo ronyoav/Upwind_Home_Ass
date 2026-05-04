@@ -7,3 +7,20 @@ services:
     envVars:
       - key: API_KEY_CLAUDE
         sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: VIRUSTOTAL_API_KEY
+        sync: false
+
+  - type: worker
+    name: email-security-worker
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: celery -A backend.worker worker --loglevel=info --concurrency=2
+    envVars:
+      - key: API_KEY_CLAUDE
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: VIRUSTOTAL_API_KEY
+        sync: false
