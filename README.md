@@ -8,7 +8,7 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  Gmail Add-on                       │
+│          Phase 1 — Gmail Add-on                     │
 │  • Client-side PII stripping (SSN, credit cards)    │
 │  • Tracking pixel removal                           │
 │  • URL extraction + PII redaction                   │
@@ -19,7 +19,7 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
                      │   urls, attachments[{name,mime,sha256}] }
                      ▼
        ┌─────────────────────────────────────────┐
-       │  Backend — Phase 1 (parallel)           │
+       │  Phase 2 — Backend (parallel)           │
        ├──────────────────────┬──────────────────┤
        │                      │                  │
        ▼                      ▼                  │
@@ -33,10 +33,10 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 └─────┬──────┘               │                   │
       │                      │                   │
       └──────────┬───────────┘                   │
-                 │ Phase 2 waits for sanitizer + VT
+                 │ Phase 3 waits for sanitizer + VT
                  ▼
   ┌────────────────────────────────────────────────┐
-  │  Rule Engine + LLM — parallel execution        │
+  │  Phase 3 — Rule Engine + LLM (parallel)        │
   │                                                │
   │  ┌────────────┐  ┌──────────┐  ┌───────────┐  │
   │  │  Headers   │  │ Content  │  │   URLs    │  │
