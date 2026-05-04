@@ -170,6 +170,20 @@ def _spoofed_brand(display_name: str, actual_domain: str) -> str | None:
     return None
 
 
+def _levenshtein(a: str, b: str) -> int:
+    if len(a) < len(b):
+        return _levenshtein(b, a)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for ca in a:
+        curr = [prev[0] + 1]
+        for j, cb in enumerate(b):
+            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (ca != cb)))
+        prev = curr
+    return prev[-1]
+
+
 def _is_lookalike(domain: str) -> bool:
     # Skip exact legitimate domains immediately
     if domain in _KNOWN_BRANDS.values():
@@ -201,4 +215,10 @@ def _is_lookalike(domain: str) -> bool:
         if re.search(r"(pay[p\d]a[l1]|g[o0]{2}gle|micr[o0]s[o0]ft|app[l1]e|amaz[o0]n)", candidate):
             if domain not in _KNOWN_BRANDS.values():
                 return True
+    # Edit distance: catches omissions/substitutions like linkedln.com → linkedin
+    hostname = domain.split(".")[0]
+    for brand, legit in _KNOWN_BRANDS.items():
+        brand_word = brand.split()[0]
+        if len(brand_word) >= 6 and hostname != brand_word and _levenshtein(hostname, brand_word) <= 1:
+            return True
     return False
