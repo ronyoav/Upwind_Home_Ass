@@ -54,6 +54,7 @@ def _lookup(sha256: str, api_key: str) -> dict | None:
         response = httpx.get(
             _VT_URL.format(hash=sha256),
             headers={"x-apikey": api_key},
+            params={"fields": "last_analysis_stats,last_analysis_results"},
             timeout=_TIMEOUT,
         )
         if response.status_code == 404:
