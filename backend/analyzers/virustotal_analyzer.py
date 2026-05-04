@@ -23,22 +23,27 @@ def analyze_with_virustotal(attachments: list[AttachmentMeta]) -> tuple[int, lis
         if result is None:
             continue
 
-        malicious = result.get("malicious", 0)
-        suspicious = result.get("suspicious", 0)
+        stats = result.get("stats", {})
+        engines = result.get("engines", [])
+        malicious = stats.get("malicious", 0)
+        suspicious = stats.get("suspicious", 0)
 
         if malicious >= 3:
             score += 50
+            engine_sample = ", ".join(engines[:3])
             signals.append(Signal(
                 type="virustotal_malicious",
                 severity="high",
-                description=f"'{attachment.name}' flagged as malicious by {malicious} antivirus engines on VirusTotal.",
+                description=f"'{attachment.name}' flagged as malicious by {malicious} antivirus engines on VirusTotal (e.g. {engine_sample}).",
             ))
         elif malicious >= 1 or suspicious >= 3:
             score += 25
+            engine_sample = ", ".join(engines[:3]) if engines else ""
+            detail = f" (e.g. {engine_sample})" if engine_sample else ""
             signals.append(Signal(
                 type="virustotal_suspicious",
                 severity="medium",
-                description=f"'{attachment.name}' flagged as suspicious by {malicious + suspicious} antivirus engines on VirusTotal.",
+                description=f"'{attachment.name}' flagged as suspicious by {malicious + suspicious} antivirus engines on VirusTotal{detail}.",
             ))
 
     return min(score, 100), signals
@@ -56,13 +61,14 @@ def _lookup(sha256: str, api_key: str) -> dict | None:
         if response.status_code != 200:
             return None
 
-        stats = (
-            response.json()
-            .get("data", {})
-            .get("attributes", {})
-            .get("last_analysis_stats", {})
-        )
-        return stats
+        attributes = response.json().get("data", {}).get("attributes", {})
+        stats = attributes.get("last_analysis_stats", {})
+        results = attributes.get("last_analysis_results", {})
+        malicious_engines = [
+            engine for engine, r in results.items()
+            if r.get("category") == "malicious"
+        ]
+        return {"stats": stats, "engines": malicious_engines}
 
     except Exception:
         return None
