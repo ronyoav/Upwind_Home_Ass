@@ -68,6 +68,12 @@ def analyze_email(request: EmailAnalysisRequest) -> EmailAnalysisResponse:
     final_score, verdict, verdict_label = aggregate(rule_score, llm_score, all_rule_signals)
     all_signals = all_rule_signals + llm_signals
 
+    # Override: confirmed malicious by VT → always Dangerous regardless of LLM score
+    if any(s.type == "virustotal_malicious" for s in vt_signals):
+        final_score = 100
+        verdict = "dangerous"
+        verdict_label = "Likely Phishing"
+
     return EmailAnalysisResponse(
         score=final_score,
         verdict=verdict,
