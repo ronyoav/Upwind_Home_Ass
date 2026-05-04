@@ -1,5 +1,4 @@
-var SUBMIT_URL = "https://upwind-home-ass.onrender.com/api/v1/analyze";
-var RESULT_BASE_URL = "https://upwind-home-ass.onrender.com/api/v1/result/";
+var BACKEND_URL = "https://upwind-home-ass.onrender.com/api/v1/analyze";
 
 function onGmailMessage(e) {
   var accessToken = e.messageMetadata.accessToken;
@@ -74,47 +73,39 @@ function buildPayload(message, messageId) {
 }
 
 var HEALTH_URL = "https://upwind-home-ass.onrender.com/health";
-var POLL_INTERVAL_MS = 3000;
-var POLL_MAX_ATTEMPTS = 40; // up to ~2 minutes
+var MAX_RETRIES = 3;
 
 function callBackend(payload) {
-  // Warm up the server
-  try {
-    UrlFetchApp.fetch(HEALTH_URL, { muteHttpExceptions: true });
-  } catch (e) {}
-
-  // Submit the task
-  var submitResponse = UrlFetchApp.fetch(SUBMIT_URL, {
+  var options = {
     method: "post",
     contentType: "application/json",
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
-  });
+  };
 
-  if (submitResponse.getResponseCode() !== 200) {
-    throw new Error("Submit failed: HTTP " + submitResponse.getResponseCode());
+  // Warm up the server before the main request
+  try {
+    UrlFetchApp.fetch(HEALTH_URL, { muteHttpExceptions: true });
+  } catch (e) {}
+
+  for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      var response = UrlFetchApp.fetch(BACKEND_URL, options);
+      var code = response.getResponseCode();
+
+      if (code === 200) {
+        return JSON.parse(response.getContentText());
+      }
+
+      if (attempt === MAX_RETRIES) {
+        throw new Error("Backend returned HTTP " + code);
+      }
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+    }
+
+    Utilities.sleep(2000 * attempt);
   }
-
-  var taskId = JSON.parse(submitResponse.getContentText()).task_id;
-
-  // Poll until ready
-  for (var i = 0; i < POLL_MAX_ATTEMPTS; i++) {
-    Utilities.sleep(POLL_INTERVAL_MS);
-
-    var pollResponse = UrlFetchApp.fetch(RESULT_BASE_URL + taskId, {
-      method: "get",
-      muteHttpExceptions: true,
-    });
-
-    if (pollResponse.getResponseCode() !== 200) continue;
-
-    var body = JSON.parse(pollResponse.getContentText());
-    if (body.status === "ready") return body.result;
-    if (body.status === "error") throw new Error("Analysis failed on worker");
-    // status === "pending" → keep polling
-  }
-
-  throw new Error("Timed out waiting for analysis result");
 }
 
 function extractAuthValue(authResults, protocol) {

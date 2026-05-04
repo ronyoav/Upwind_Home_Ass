@@ -4,19 +4,9 @@ services:
     runtime: python
     buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: API_KEY_CLAUDE
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: VIRUSTOTAL_API_KEY
-        sync: false
-
-  - type: worker
-    name: email-security-worker
-    runtime: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: celery -A backend.worker worker --loglevel=info --concurrency=2
+    scaling:
+      minInstances: 1
+      maxInstances: 5
     envVars:
       - key: API_KEY_CLAUDE
         sync: false
