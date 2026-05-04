@@ -54,7 +54,6 @@ def _lookup(sha256: str, api_key: str) -> dict | None:
         response = httpx.get(
             _VT_URL.format(hash=sha256),
             headers={"x-apikey": api_key},
-            params={"fields": "last_analysis_stats,last_analysis_results"},
             timeout=_TIMEOUT,
         )
         if response.status_code == 404:
@@ -65,11 +64,12 @@ def _lookup(sha256: str, api_key: str) -> dict | None:
         attributes = response.json().get("data", {}).get("attributes", {})
         stats = attributes.get("last_analysis_stats", {})
         results = attributes.get("last_analysis_results", {})
-        malicious_engines = [
+        malicious_engines = sorted([
             engine for engine, r in results.items()
             if r.get("category") == "malicious"
-        ]
+        ])
         return {"stats": stats, "engines": malicious_engines}
 
-    except Exception:
+    except Exception as e:
+        print(f"VT lookup error: {e}")
         return None
