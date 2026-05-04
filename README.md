@@ -83,7 +83,7 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 | 5 | `display_name_spoofing` | "PayPal" \<attacker@gmail.com\> | Display name impersonates a brand; actual address is unrelated |
 | 6 | `lookalike_domain` | arnazon.com, paypa1.com, miсrosoft.com | Typosquat or homoglyph of a known brand |
 | 7 | `link_text_mismatch` | Shows "google.com" → href points to evil.ru | User sees one link, clicks another |
-| 8 | `url_shortener` | bit.ly, tinyurl | True destination is hidden |
+| 8 | `url_shortener` | bit.ly, tinyurl | Destination resolved via HEAD request; real URL analyzed for all other signals |
 | 9 | `suspicious_tld` | .xyz, .top, .click, .tk | TLDs commonly used in phishing infrastructure |
 | 10 | `ip_url` | http://185.23.4.1/login | No legitimate domain — hides who owns the server |
 | 11 | `base64_payload` | Long base64 string in HTML body | Malicious JS hidden from content scanners |
@@ -119,7 +119,7 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 | | `captcha_lure` — CAPTCHA in email body (hides phishing page from scanners) | Medium | +20 |
 | | `ransomware` — "files encrypted", "pay to recover", "decryption key" | High | +40 |
 | | `sextortion` — "I recorded you", "pay or I'll share" | High | +40 |
-| **URLs** | `url_shortener` — bit.ly, tinyurl (destination hidden) | Medium | +15 |
+| **URLs** | `url_shortener` — bit.ly, tinyurl; real destination resolved via HEAD request and analyzed | Medium | +15 |
 | | `suspicious_tld` — .xyz, .top, .click, .loan, .tk, .ml, .gq | High | +20 |
 | | `ip_url` — http://185.x.x.x (no legitimate domain) | High | +25 |
 | | `http_url` — unencrypted links | Low | +10 |
