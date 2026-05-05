@@ -159,6 +159,16 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 
 ## Design Decisions
 
+### Key Design Choices
+
+- **Privacy by design** — SHA-256 hash lookup against VirusTotal instead of uploading the file. The backend never sees attachment content. PII is stripped client-side before the payload leaves the browser, with a second stripping layer in the backend as defense-in-depth.
+- **Prompt injection hardening** — LLM acts as a feature extractor only, returning a strictly typed JSON schema. A deterministic rule engine scores the features — the LLM cannot inflate the score directly. Known injection phrases are scrubbed from email content before it reaches the LLM.
+- **Lookalike domain detection beyond simple matching** — four attack vectors covered: unicode homoglyphs, visual substitutions (rn→m), digit substitutions (0→o), and Levenshtein edit distance (catches linkedln.com, micosoft.com — one character off from the real brand).
+- **URL unshortening** — shortened URLs (bit.ly, tinyurl) are expanded via a HEAD-only request before analysis. No content is downloaded; all subsequent checks run on the real destination.
+- **Trusted sender whitelist** — ATS platforms (Greenhouse, Workday, Lever) and marketing services (SendGrid, Mailchimp) are whitelisted. Missing SPF/DKIM is expected for these senders and not penalized, eliminating false positives on legitimate HR emails.
+
+---
+
 ### Why hybrid rule engine + LLM?
 
 Rule engines are deterministic and explainable — every signal maps to a concrete observation with a fixed score. LLMs understand context and nuance that rules miss (e.g., tone, intent, novel phishing narratives, social engineering with friendly language). The 70/30 split keeps the system explainable by default while benefiting from AI analysis.
