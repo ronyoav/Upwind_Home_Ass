@@ -23,14 +23,16 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
        ├──────────────────────┬──────────────────┤
        │                      │                  │
        ▼                      ▼                  │
-┌────────────┐       ┌────────────────┐          │
-│ Sanitizer  │       │  VirusTotal    │          │
-│ HTML clean │       │  sha256 →      │          │
-│ PII strip  │       │  VT API →      │          │
-│ Link mis-  │       │  70+ AV engines│          │
-│ match      │       └───────┬────────┘          │
-│ Base64     │               │                   │
-└─────┬──────┘               │                   │
+┌──────────────────┐  ┌────────────────┐          │
+│ Sanitizer        │  │  VirusTotal    │          │
+│ HTML clean       │  │  sha256 →      │          │
+│ PII strip        │  │  VT API →      │          │
+│  (2nd layer)     │  │  70+ AV engines│          │
+│ Prompt injection │  └───────┬────────┘          │
+│  removal → LLM   │          │                   │
+│ Link mismatch    │          │                   │
+│ Base64 detect    │          │                   │
+└────────┬─────────┘          │                   │
       │                      │                   │
       └──────────┬───────────┘                   │
                  │ Phase 3 waits for sanitizer + VT
