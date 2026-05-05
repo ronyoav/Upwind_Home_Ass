@@ -97,7 +97,7 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 | 8 | `url_shortener` | bit.ly, tinyurl | Destination resolved via HEAD request; real URL analyzed for all other signals |
 | 9 | `suspicious_tld` | .xyz, .top, .click, .tk | TLDs commonly used in phishing infrastructure |
 | 10 | `ip_url` | http://185.23.4.1/login | No legitimate domain — hides who owns the server |
-| 11 | `base64_payload` | Long base64 string in HTML body | Malicious JS hidden from content scanners |
+| 11 | `base64_payload` | Long base64 string in HTML body | Hides malicious URLs or content from spam filters — rendered only when the user clicks |
 | 12 | `credential_phishing` | "confirm your details", "verify your account" | Email requests login credentials or personal verification |
 | 13 | `urgency_language` | "act now", "expires in 24h" | Pressure designed to bypass critical thinking |
 | 14 | `financial_lure` | gift card, bitcoin, lottery | Financial bait to manipulate the recipient |
