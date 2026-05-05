@@ -157,17 +157,49 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
 
 ---
 
-## Design Decisions
+## Trade-offs
 
-### Key Design Choices
+### VirusTotal Hash Lookup vs. Sandbox Execution
 
-- **Privacy by design** — SHA-256 hash lookup against VirusTotal instead of uploading the file. The backend never sees attachment content. PII is stripped client-side before the payload leaves the browser, with a second stripping layer in the backend as defense-in-depth.
-- **Prompt injection hardening** — LLM acts as a feature extractor only, returning a strictly typed JSON schema. A deterministic rule engine scores the features — the LLM cannot inflate the score directly. Known injection phrases are scrubbed from email content before it reaches the LLM.
-- **Lookalike domain detection beyond simple matching** — four attack vectors covered: unicode homoglyphs, visual substitutions (rn→m), digit substitutions (0→o), and Levenshtein edit distance (catches linkedln.com, micosoft.com — one character off from the real brand).
-- **URL unshortening** — shortened URLs (bit.ly, tinyurl) are expanded via a HEAD-only request before analysis. No content is downloaded; all subsequent checks run on the real destination.
-- **Trusted sender whitelist** — ATS platforms (Greenhouse, Workday, Lever) and marketing services (SendGrid, Mailchimp) are whitelisted. Missing SPF/DKIM is expected for these senders and not penalized, eliminating false positives on legitimate HR emails.
+Sandbox execution runs the actual file inside a virtual machine and observes its behavior — the gold standard for malware detection. It was considered and rejected for three reasons:
+
+- **Latency** — sandbox analysis takes 2–5 minutes per file. A Gmail Add-on must return a result in seconds to be usable.
+- **Resources** — each file requires a dedicated VM with CPU and RAM allocation. For a demo-scale add-on this is significant over-engineering.
+- **Privacy** — attachments may contain sensitive user data (employment contracts, medical documents). Uploading file contents to an external execution environment raises legitimate privacy concerns the user never consented to. Sending only a SHA-256 hash means the backend never sees the file contents.
+
+The trade-off accepted: zero-day malware with no prior VirusTotal history will not be caught. Known malware is caught immediately.
 
 ---
+
+### Celery Worker Queue vs. Render Instance Scaling
+
+The scalable architecture would use Redis as a message broker with Celery workers consuming tasks from the queue — decoupling request intake from processing and handling large load spikes gracefully.
+
+This was rejected because running a Celery worker is a separate paid service on Render. Instead, the `render.yaml` is configured with up to 5 parallel instances of the FastAPI service itself, which provides horizontal scaling sufficient for the demo scope without the added infrastructure cost and complexity.
+
+The trade-off accepted: under extreme load the system will queue at the HTTP layer rather than at a dedicated task queue, which is less efficient but operationally simpler and free.
+
+---
+
+## If I Had More Time
+
+### Celery Worker Queue for True Horizontal Scaling
+
+The current setup scales by running up to 5 parallel FastAPI instances via `render.yaml`. A proper production architecture would introduce Celery with Redis as a message broker — decoupling HTTP request intake from analysis processing. This would allow workers to scale independently from the API layer and handle sustained high-volume traffic more gracefully than HTTP-layer queuing.
+
+### Feedback Loop — "Report as Mistake" Button
+
+A "Report False Positive" button in the Gmail Add-on UI would collect real-world mislabeled emails from users. This data would be used to tune Rule Engine thresholds and scores based on actual field evidence — the system improves the more it is used, which is product thinking beyond pure engineering.
+
+If the project were to migrate to a model that supports fine-tuning (e.g., a locally hosted open-source model via Ollama), the collected false positive dataset could be used to fine-tune the model directly. This would also eliminate per-call API costs and remove privacy concerns entirely, since inference would run locally with no data leaving the server.
+
+### Sandbox Execution for Zero-Day Attachment Detection
+
+The current approach catches known malware via VirusTotal hash lookup but misses zero-day threats with no prior detection history. A sandbox would execute the attachment inside an isolated VM and observe its runtime behavior — catching novel malware regardless of whether it appears in any threat-intel database. The latency and resource cost make this impractical for a demo add-on but it is the right long-term direction for attachment analysis.
+
+---
+
+## Design Decisions
 
 ### Why hybrid rule engine + LLM?
 
@@ -185,21 +217,10 @@ The LLM system prompt explicitly instructs the model that all email content is u
 
 Known legitimate third-party senders (ATS platforms like Greenhouse, Lever, Workday; email marketing services like SendGrid, Mailchimp, HubSpot; cloud providers) are whitelisted. Missing SPF/DKIM records are expected and not penalized for these senders, eliminating false positives on legitimate HR and transactional emails.
 
-### Lookalike domain detection
-
-Covers four attack vectors:
-- **Unicode homoglyphs** — Cyrillic/Greek characters that look identical to ASCII (е, о, р, ο, ν)
-- **Multi-character visual substitutions** — `rn→m` (arnazon), `vv→w`, `cl→d`
-- **Digit substitutions** — `0→o`, `1→l` (paypa1, g00gle, micros0ft)
-- **Keyword presence** — brand name present in domain that isn't the legitimate domain
 
 ### Why Redis cache?
 
 LLM calls are the only expensive operation (~500ms, ~$0.001 each). Identical emails (mass phishing campaigns) are analyzed once and served from cache for 1 hour. If Redis is unavailable, the system falls back gracefully — no crash, just no cache.
-
-### Why VirusTotal for attachments?
-
-Attachment content is never opened or executed. We compute a SHA-256 hash client-side in the Gmail Add-on and look it up against VirusTotal's database of 70+ antivirus engines. This gives threat-intel coverage without running untrusted code. If the hash is unknown (not in VT database), no penalty is applied — absence of evidence is not evidence of malice.
 
 ### Why does VirusTotal run in parallel with the sanitizer?
 
