@@ -19,6 +19,14 @@ A Gmail Add-on that analyzes incoming emails in real-time and assigns a phishing
                      │   urls, attachments[{name,mime,sha256}] }
                      ▼
        ┌─────────────────────────────────────────┐
+       │  Redis Cache Check                      │
+       │  hash(email content) → cache hit?       │
+       │  YES → return cached result immediately │
+       │  NO  → continue to Phase 2              │
+       └──────────────────┬──────────────────────┘
+                          │ cache miss
+                          ▼
+       ┌─────────────────────────────────────────┐
        │  Phase 2 — Backend (parallel)           │
        ├──────────────────────┬──────────────────┤
        │                      │                  │
