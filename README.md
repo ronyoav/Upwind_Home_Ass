@@ -183,7 +183,7 @@ The trade-off accepted: zero-day malware with no prior VirusTotal history will n
 
 The scalable architecture would use Redis as a message broker with Celery workers consuming tasks from the queue — decoupling request intake from processing and handling large load spikes gracefully.
 
-This was rejected because running a Celery worker is a separate paid service on Render. Instead, the `render.yaml` is configured with up to 5 parallel instances of the FastAPI service itself, which provides horizontal scaling sufficient for the demo scope without the added infrastructure cost and complexity.
+This was rejected because running a Celery worker is a separate paid service on Render. Instead, the `render.yaml` is configured with a single instance of the FastAPI service, which is sufficient for the demo scope without the added infrastructure cost and complexity.
 
 The trade-off accepted: under extreme load the system will queue at the HTTP layer rather than at a dedicated task queue, which is less efficient but operationally simpler and free.
 
